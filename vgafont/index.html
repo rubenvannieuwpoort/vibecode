@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VGA Font Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            font-size: 14px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #displayCanvas {
+            border: 1px solid #ccc;
+            background-color: #000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #fontData {
+            width: 100%;
+            height: 400px;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 10px;
+            box-sizing: border-box;
+            background-color: #f5f5f5;
+            overflow-y: scroll;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        .status {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>VGA Font Viewer</h1>
+
+        <div class="section">
+            <h2>Load Font</h2>
+            <div class="status" id="status">Loading font.bmp...</div>
+        </div>
+
+        <div class="section">
+            <h2>Enter Text</h2>
+            <textarea id="textInput" placeholder="Enter text to display...">Hello, World!</textarea>
+            <br><br>
+            <button id="displayBtn">Display</button>
+        </div>
+
+        <div class="section">
+            <h2>Display Output</h2>
+            <canvas id="displayCanvas"></canvas>
+        </div>
+
+        <div class="section">
+            <h2>Font Data</h2>
+            <textarea id="fontData" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        const CHAR_WIDTH = 8;
+        const CHAR_HEIGHT = 16;
+        const GRID_SIZE = 16; // 16x16 grid
+
+        let fontData = {}; // Will store extracted character data
+
+        // Load and process the font image
+        function loadFontImage() {
+            const img = new Image();
+            img.onload = function() {
+                extractFontData(img);
+                document.getElementById('status').textContent = 'Font loaded successfully!';
+                document.getElementById('status').style.color = '#4CAF50';
+            };
+            img.onerror = function() {
+                document.getElementById('status').textContent = 'Error loading font.bmp. Make sure the file exists in the same directory.';
+                document.getElementById('status').style.color = '#f44336';
+            };
+            img.src = 'font.bmp';
+        }
+
+        // Extract character data from the image
+        function extractFontData(img) {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+
+            // Extract each character from the 16x16 grid
+            for (let charRow = 0; charRow < GRID_SIZE; charRow++) {
+                for (let charCol = 0; charCol < GRID_SIZE; charCol++) {
+                    const charCode = charRow * GRID_SIZE + charCol;
+                    const charPixels = [];
+
+                    // Extract 8x16 character
+                    for (let y = 0; y < CHAR_HEIGHT; y++) {
+                        let rowBinary = '';
+                        for (let x = 0; x < CHAR_WIDTH; x++) {
+                            const pixelX = charCol * CHAR_WIDTH + x;
+                            const pixelY = charRow * CHAR_HEIGHT + y;
+                            const pixelIndex = (pixelY * canvas.width + pixelX) * 4;
+
+                            // Check if pixel is white/bright (font pixel)
+                            const r = pixels[pixelIndex];
+                            const g = pixels[pixelIndex + 1];
+                            const b = pixels[pixelIndex + 2];
+                            const brightness = (r + g + b) / 3;
+
+                            rowBinary += brightness > 128 ? '1' : '0';
+                        }
+                        charPixels.push(rowBinary);
+                    }
+
+                    fontData[charCode] = charPixels;
+                }
+            }
+
+            // Generate font data output
+            generateFontDataOutput();
+        }
+
+        // Generate the text output showing font data
+        function generateFontDataOutput() {
+            let output = '';
+
+            // Output printable ASCII characters (32-126) and some extended
+            for (let charCode = 0; charCode < 256; charCode++) {
+                if (fontData[charCode]) {
+                    const char = String.fromCharCode(charCode);
+                    const displayChar = charCode >= 32 && charCode <= 126 ? char : `\\x${charCode.toString(16).padStart(2, '0')}`;
+
+                    output += `-- character: ${displayChar}, decimal: ${charCode}, hexadecimal: 0x${charCode.toString(16).toUpperCase().padStart(2, '0')}\n`;
+
+                    fontData[charCode].forEach(row => {
+                        output += `"${row}",\n`;
+                    });
+                    output += '\n';
+                }
+            }
+
+            document.getElementById('fontData').value = output;
+        }
+
+        // Display text using the extracted font
+        function displayText() {
+            const text = document.getElementById('textInput').value;
+            const canvas = document.getElementById('displayCanvas');
+
+            if (Object.keys(fontData).length === 0) {
+                alert('Font not loaded yet. Please wait.');
+                return;
+            }
+
+            // Calculate canvas size
+            const lines = text.split('\n');
+            const maxLineLength = Math.max(...lines.map(line => line.length));
+            const canvasWidth = maxLineLength * CHAR_WIDTH;
+            const canvasHeight = lines.length * CHAR_HEIGHT;
+
+            canvas.width = canvasWidth || CHAR_WIDTH;
+            canvas.height = canvasHeight || CHAR_HEIGHT;
+
+            const ctx = canvas.getContext('2d');
+
+            // Clear canvas (black background)
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Set pixel color for text (white)
+            ctx.fillStyle = '#fff';
+
+            // Draw each character
+            let currentY = 0;
+            lines.forEach(line => {
+                let currentX = 0;
+                for (let i = 0; i < line.length; i++) {
+                    const charCode = line.charCodeAt(i);
+                    const charPixels = fontData[charCode];
+
+                    if (charPixels) {
+                        // Draw character pixel by pixel
+                        for (let y = 0; y < CHAR_HEIGHT; y++) {
+                            for (let x = 0; x < CHAR_WIDTH; x++) {
+                                if (charPixels[y][x] === '1') {
+                                    ctx.fillRect(currentX + x, currentY + y, 1, 1);
+                                }
+                            }
+                        }
+                    }
+                    currentX += CHAR_WIDTH;
+                }
+                currentY += CHAR_HEIGHT;
+            });
+        }
+
+        // Event listeners
+        document.getElementById('displayBtn').addEventListener('click', displayText);
+
+        // Load font on page load
+        window.addEventListener('load', loadFontImage);
+    </script>
+</body>
+</html>
