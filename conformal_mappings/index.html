@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complex Plane Image Transformer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .controls {
+            margin-bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .upload-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: 600;
+        }
+
+        .file-input-label:hover {
+            background: #5568d3;
+        }
+
+        .file-name {
+            color: #666;
+            font-style: italic;
+        }
+
+        .transform-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .transform-section label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .transform-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.3s;
+        }
+
+        .transform-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .apply-btn {
+            padding: 12px 24px;
+            background: #764ba2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .apply-btn:hover {
+            background: #653a8e;
+        }
+
+        .apply-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .presets {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            padding: 8px 16px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .preset-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .canvas-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .canvas-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .canvas-wrapper h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.3em;
+        }
+
+        canvas {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .error-message {
+            padding: 12px;
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 6px;
+            color: #c33;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .info {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 20px;
+        }
+
+        .info h3 {
+            margin-bottom: 8px;
+            color: #1976d2;
+        }
+
+        .info ul {
+            margin-left: 20px;
+            color: #333;
+        }
+
+        .info code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Complex Plane Image Transformer</h1>
+
+        <div class="controls">
+            <div class="upload-section">
+                <div class="file-input-wrapper">
+                    <input type="file" id="imageUpload" accept="image/*">
+                    <label for="imageUpload" class="file-input-label">Choose Image</label>
+                </div>
+                <span class="file-name" id="fileName">No file chosen</span>
+            </div>
+
+            <div class="transform-section">
+                <label for="transformInput">Transformation:</label>
+                <input
+                    type="text"
+                    id="transformInput"
+                    class="transform-input"
+                    placeholder="e.g., z^2, 1/z, z + 1, exp(z)"
+                    value="z^2"
+                >
+                <button id="applyBtn" class="apply-btn" disabled>Apply Transform</button>
+            </div>
+
+            <div class="presets">
+                <strong>Presets:</strong>
+                <button class="preset-btn" data-transform="z^2">z²</button>
+                <button class="preset-btn" data-transform="z^3">z³</button>
+                <button class="preset-btn" data-transform="1/z">1/z</button>
+                <button class="preset-btn" data-transform="sqrt(z)">√z</button>
+                <button class="preset-btn" data-transform="exp(z)">e^z</button>
+                <button class="preset-btn" data-transform="log(z)">log(z)</button>
+                <button class="preset-btn" data-transform="sin(z)">sin(z)</button>
+                <button class="preset-btn" data-transform="(z^2 + 1)/(z^2 - 1)">Möbius</button>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <h2>Original Image</h2>
+                <canvas id="originalCanvas"></canvas>
+            </div>
+            <div class="canvas-wrapper">
+                <h2>Transformed Image</h2>
+                <canvas id="transformedCanvas"></canvas>
+            </div>
+        </div>
+
+        <div class="info">
+            <h3>How to use:</h3>
+            <ul>
+                <li>Upload an image using the "Choose Image" button</li>
+                <li>Enter a complex transformation in the textbox (use <code>z</code> as the variable)</li>
+                <li>Click "Apply Transform" to see the result</li>
+                <li>Try the preset transformations for quick examples</li>
+            </ul>
+            <h3 style="margin-top: 15px;">Supported functions:</h3>
+            <ul>
+                <li>Basic operations: <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>^</code></li>
+                <li>Functions: <code>sqrt()</code>, <code>exp()</code>, <code>log()</code>, <code>sin()</code>, <code>cos()</code>, <code>tan()</code></li>
+                <li>Complex functions: <code>conj()</code>, <code>abs()</code>, <code>arg()</code>, <code>re()</code>, <code>im()</code></li>
+                <li>Constants: <code>i</code>, <code>pi</code>, <code>e</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let currentImage = null;
+        let transformFunction = null;
+
+        const imageUpload = document.getElementById('imageUpload');
+        const fileName = document.getElementById('fileName');
+        const transformInput = document.getElementById('transformInput');
+        const applyBtn = document.getElementById('applyBtn');
+        const originalCanvas = document.getElementById('originalCanvas');
+        const transformedCanvas = document.getElementById('transformedCanvas');
+        const errorMessage = document.getElementById('errorMessage');
+        const presetBtns = document.querySelectorAll('.preset-btn');
+
+        // Handle image upload
+        imageUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileName.textContent = file.name;
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        currentImage = img;
+                        displayOriginalImage(img);
+                        applyBtn.disabled = false;
+                        errorMessage.style.display = 'none';
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Display original image
+        function displayOriginalImage(img) {
+            const ctx = originalCanvas.getContext('2d');
+            const maxSize = 500;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxSize || height > maxSize) {
+                const ratio = Math.min(maxSize / width, maxSize / height);
+                width *= ratio;
+                height *= ratio;
+            }
+
+            originalCanvas.width = width;
+            originalCanvas.height = height;
+            ctx.drawImage(img, 0, 0, width, height);
+        }
+
+        // Parse and compile transformation function
+        function compileTransform(expression) {
+            try {
+                // Replace 'z' with a placeholder for compilation
+                const code = math.compile(expression);
+
+                // Test the function with a complex number
+                const testResult = code.evaluate({ z: math.complex(1, 1) });
+
+                // Return a function that takes a complex number and returns a complex number
+                return (z) => {
+                    const result = code.evaluate({ z: z });
+                    // Handle both complex and real results
+                    if (typeof result === 'number') {
+                        return math.complex(result, 0);
+                    }
+                    return result;
+                };
+            } catch (error) {
+                throw new Error(`Invalid transformation: ${error.message}`);
+            }
+        }
+
+        // Apply transformation
+        applyBtn.addEventListener('click', function() {
+            if (!currentImage) return;
+
+            try {
+                transformFunction = compileTransform(transformInput.value);
+                applyTransformation();
+                errorMessage.style.display = 'none';
+            } catch (error) {
+                showError(error.message);
+            }
+        });
+
+        // Preset buttons
+        presetBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                transformInput.value = this.dataset.transform;
+                if (currentImage) {
+                    applyBtn.click();
+                }
+            });
+        });
+
+        // Show error message
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        // Apply the transformation to the image
+        function applyTransformation() {
+            const width = originalCanvas.width;
+            const height = originalCanvas.height;
+
+            transformedCanvas.width = width;
+            transformedCanvas.height = height;
+
+            const srcCtx = originalCanvas.getContext('2d');
+            const dstCtx = transformedCanvas.getContext('2d');
+
+            const srcImageData = srcCtx.getImageData(0, 0, width, height);
+            const dstImageData = dstCtx.createImageData(width, height);
+
+            // Determine the scale of the complex plane
+            const scale = 2 / Math.min(width, height);
+
+            // For each pixel in the destination
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    // Convert pixel coordinates to complex number
+                    const zx = (x - width / 2) * scale;
+                    const zy = (height / 2 - y) * scale;
+                    const z = math.complex(zx, zy);
+
+                    try {
+                        // Apply inverse transformation
+                        // For display, we actually want to apply the forward transform
+                        // to see where each output pixel came from
+                        const w = transformFunction(z);
+
+                        // Convert back to pixel coordinates
+                        const wx = math.re(w) / scale + width / 2;
+                        const wy = height / 2 - math.im(w) / scale;
+
+                        // Bilinear interpolation from source image
+                        const color = getPixelBilinear(srcImageData, wx, wy, width, height);
+
+                        const dstIdx = (y * width + x) * 4;
+                        dstImageData.data[dstIdx] = color[0];
+                        dstImageData.data[dstIdx + 1] = color[1];
+                        dstImageData.data[dstIdx + 2] = color[2];
+                        dstImageData.data[dstIdx + 3] = color[3];
+                    } catch (error) {
+                        // If transformation fails for this point, use black
+                        const dstIdx = (y * width + x) * 4;
+                        dstImageData.data[dstIdx] = 0;
+                        dstImageData.data[dstIdx + 1] = 0;
+                        dstImageData.data[dstIdx + 2] = 0;
+                        dstImageData.data[dstIdx + 3] = 255;
+                    }
+                }
+            }
+
+            dstCtx.putImageData(dstImageData, 0, 0);
+        }
+
+        // Bilinear interpolation for smooth results
+        function getPixelBilinear(imageData, x, y, width, height) {
+            // If out of bounds, return transparent black
+            if (x < 0 || x >= width - 1 || y < 0 || y >= height - 1) {
+                return [0, 0, 0, 0];
+            }
+
+            const x1 = Math.floor(x);
+            const y1 = Math.floor(y);
+            const x2 = x1 + 1;
+            const y2 = y1 + 1;
+
+            const fx = x - x1;
+            const fy = y - y1;
+
+            const getPixel = (px, py) => {
+                const idx = (py * width + px) * 4;
+                return [
+                    imageData.data[idx],
+                    imageData.data[idx + 1],
+                    imageData.data[idx + 2],
+                    imageData.data[idx + 3]
+                ];
+            };
+
+            const c11 = getPixel(x1, y1);
+            const c21 = getPixel(x2, y1);
+            const c12 = getPixel(x1, y2);
+            const c22 = getPixel(x2, y2);
+
+            const result = [];
+            for (let i = 0; i < 4; i++) {
+                const top = c11[i] * (1 - fx) + c21[i] * fx;
+                const bottom = c12[i] * (1 - fx) + c22[i] * fx;
+                result[i] = Math.round(top * (1 - fy) + bottom * fy);
+            }
+
+            return result;
+        }
+
+        // Allow Enter key to apply transformation
+        transformInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !applyBtn.disabled) {
+                applyBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>
